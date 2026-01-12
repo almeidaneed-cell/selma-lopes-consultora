@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Selma Lopes Consultora • Estoque</title>
+
+  <!-- PWA (App) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#111111">
+  <link rel="icon" href="logo.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <style>
+    :root { --gap: 12px; --radius: 12px; --border: #e5e7eb; --bg: #f7f7f8; }
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;background:var(--bg);color:#111}
+    header{position:sticky;top:0;background:white;border-bottom:1px solid var(--border);padding:14px 16px;z-index:10}
+    header h1{margin:0;font-size:18px}
+    main{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:var(--gap)}
+    .grid{display:grid;gap:var(--gap)}
+    @media(min-width:980px){ .cols2{grid-template-columns:1.2fr .8fr} .cols3{grid-template-columns:1fr 1fr 1fr}}
+    .card{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+    .card h2{margin:0 0 10px;font-size:16px}
+    .row{display:grid;gap:10px}
+    @media(min-width:720px){
+      .row.cols4{grid-template-columns:2fr 1.2fr 1fr 1fr}
+      .row.cols3{grid-template-columns:2fr 1fr 1fr}
+      .row.cols2{grid-template-columns:1fr 1fr}
+    }
+    label{font-size:12px;color:#374151}
+    input, select, textarea{
+      width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:white;
+      outline:none;
+    }
+    textarea{min-height:80px;resize:vertical}
+    button{
+      padding:10px 12px;border:1px solid var(--border);background:#111;color:#fff;border-radius:10px;
+      cursor:pointer;font-weight:600;
+    }
+    button.secondary{background:white;color:#111}
+    button.danger{background:#b91c1c}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .muted{color:#6b7280;font-size:12px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-size:12px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+    .toolbar .left,.toolbar .right{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--border);padding:10px 8px;text-align:left;font-size:13px;vertical-align:top}
+    th{font-size:12px;color:#374151}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .kpi{display:grid;gap:10px}
+    @media(min-width:720px){ .kpi{grid-template-columns:1fr 1fr 1fr}}
+    .kpi .box{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+    .kpi .box b{font-size:18px}
+    .warn{color:#b45309;font-weight:700}
+    .ok{color:#047857;font-weight:700}
+    .tiny{font-size:11px;color:#6b7280}
+    .split{display:grid;gap:var(--gap)}
+    @media(min-width:980px){ .split{grid-template-columns:1.3fr .7fr}}
+    .note{background:#fff7ed;border:1px solid #fed7aa}
+  </style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:14px">
+    <img src="logo.png" alt="Logo Selma Lopes Consultora"
+         style="height:55px;border-radius:8px;object-fit:contain">
+    <div>
+      <h1 style="margin:0;font-size:20px">Selma Lopes Consultora</h1>
+      <div style="font-size:13px;color:#6b7280">Controle de Estoque • Natura • O Boticário</div>
+    </div>
+  </div>
+
+  <div class="toolbar" style="margin-top:12px">
+    <div class="left">
+      <span class="pill" id="statusPill">Salvo no aparelho ✅</span>
+    </div>
+    <div class="right">
+      <button class="secondary" id="btnExport">Exportar Backup</button>
+      <label class="secondary" style="display:inline-block">
+        <input type="file" id="fileImport" accept="application/json" style="display:none" />
+        <button class="secondary" id="btnImport" type="button">Importar Backup</button>
+      </label>
+      <button class="danger" id="btnReset">Zerar Tudo</button>
+    </div>
+  </div>
+
+  <p class="muted" style="margin:8px 0 0">Dica: faça backup 1x por semana.</p>
+</header>
+
+<main>
+  <section class="kpi">
+    <div class="box">
+      <div class="tiny">Produtos cadastrados</div>
+      <b id="kpiProdutos">0</b>
+    </div>
+    <div class="box">
+      <div class="tiny">Itens em estoque (soma das quantidades)</div>
+      <b id="kpiItens">0</b>
+    </div>
+    <div class="box">
+      <div class="tiny">Total a receber (clientes devendo)</div>
+      <b>R$ <span id="kpiReceber">0,00</span></b>
+    </div>
+  </section>
+
+  <section class="split">
+    <!-- ESTOQUE -->
+    <div class="card">
+      <div class="toolbar" style="margin-bottom:10px">
+        <h2 style="margin:0">📦 Estoque</h2>
+        <div class="right">
+          <input id="searchProduto" placeholder="Buscar produto (nome, marca, SKU)" />
+          <select id="filtroMarca" style="max-width:180px">
+            <option value="">Todas marcas</option>
+            <option value="Natura">Natura</option>
+            <option value="Boticário">Boticário</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card note" style="margin-bottom:12px">
+        <div class="row cols4">
+          <div>
+            <label>Nome do produto</label>
+            <input id="pNome" placeholder="Ex: Perfume X / Creme Y" />
+          </div>
+          <div>
+            <label>Marca</label>
+            <select id="pMarca">
+              <option value="Natura">Natura</option>
+              <option value="Boticário">Boticário</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+          <div>
+            <label>SKU / Código (opcional)</label>
+            <input id="pSku" placeholder="Ex: NAT-123" />
+          </div>
+          <div>
+            <label>Estoque mínimo</label>
+            <input id="pMin" type="number" min="0" value="1" />
+          </div>
+        </div>
+
+        <div class="row cols4" style="margin-top:10px">
+          <div>
+            <label>Preço de custo (R$)</label>
+            <input id="pCusto" inputmode="decimal" placeholder="Ex: 25,90" />
+          </div>
+          <div>
+            <label>Preço de venda (R$)</label>
+            <input id="pVenda" inputmode="decimal" placeholder="Ex: 49,90" />
+          </div>
+          <div>
+            <label>Quantidade inicial</label>
+            <input id="pQtd" type="number" min="0" value="0" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:end">
+            <button id="btnAddProduto">Cadastrar produto</button>
+            <button class="secondary" id="btnLimparProduto" type="button">Limpar</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:10px 0 0">Cadastre produtos e depois registre entradas/saídas.</p>
+      </div>
+
+      <div class="card">
+        <div class="toolbar" style="margin-bottom:8px">
+          <div class="left">
+            <span class="pill">Entrada/Saída rápida</span>
+            <span class="muted">Selecione um produto na tabela e ajuste abaixo.</span>
+          </div>
+        </div>
+        <div class="row cols4">
+          <div>
+            <label>Produto selecionado</label>
+            <input id="movProduto" disabled placeholder="Clique em um produto na tabela" />
+          </div>
+          <div>
+            <label>Tipo</label>
+            <select id="movTipo">
+              <option value="entrada">Entrada (+)</option>
+              <option value="saida">Saída (-)</option>
+            </select>
+          </div>
+          <div>
+            <label>Quantidade</label>
+            <input id="movQtd" type="number" min="1" value="1" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:end">
+            <button id="btnMov">Registrar</button>
+            <button class="secondary" id="btnMovLimpar" type="button">Limpar</button>
+          </div>
+        </div>
+        <div class="row cols2" style="margin-top:10px">
+          <div>
+            <label>Observação (opcional)</label>
+            <input id="movObs" placeholder="Ex: compra do fornecedor / venda no balcão" />
+          </div>
+          <div>
+            <label>Data</label>
+            <input id="movData" type="date" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="toolbar" style="margin-bottom:8px">
+          <h2 style="margin:0">Lista de produtos</h2>
+          <div class="right">
+            <button class="secondary" id="btnCSV">Exportar CSV</button>
+          </div>
+        </div>
+        <div style="overflow:auto">
+          <table id="tblProdutos">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Marca</th>
+                <th>SKU</th>
+                <th>Qtd</th>
+                <th>Mín.</th>
+                <th>Venda</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted" style="margin:10px 0 0">
+          Status: <span class="ok">OK</span> acima do mínimo • <span class="warn">BAIXO</span> abaixo do mínimo
+        </p>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2>📜 Histórico (entradas/saídas)</h2>
+        <div class="toolbar" style="margin-bottom:8px">
+          <div class="left">
+            <input id="searchMov" placeholder="Buscar no histórico (produto/obs)" />
+          </div>
+          <div class="right">
+            <button class="secondary" id="btnLimparHistorico">Limpar histórico</button>
+          </div>
+        </div>
+        <div style="overflow:auto">
+          <table id="tblMov">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Produto</th>
+                <th>Tipo</th>
+                <th>Qtd</th>
+                <th>Obs</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES / FIADO -->
+    <div class="grid" style="gap:12px">
+      <div class="card">
+        <h2>💳 Clientes que devem (Fiado / Notas)</h2>
+        <div class="row cols2">
+          <div>
+            <label>Nome do cliente</label>
+            <input id="cNome" placeholder="Ex: Maria / João" />
+          </div>
+          <div>
+            <label>Telefone (opcional)</label>
+            <input id="cFone" placeholder="Ex: (27) 99999-9999" />
+          </div>
+        </div>
+        <div class="row cols2" style="margin-top:10px">
+          <div>
+            <label>Valor (R$)</label>
+            <input id="cValor" inputmode="decimal" placeholder="Ex: 120,00" />
+          </div>
+          <div>
+            <label>Vencimento</label>
+            <input id="cVenc" type="date" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Descrição / Nota (o que ele comprou)</label>
+            <textarea id="cDesc" placeholder="Ex: 1 perfume + 2 cremes (pagamento combinado para tal dia)"></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnAddDivida">Lançar nota</button>
+          <button class="secondary" id="btnLimparDivida" type="button">Limpar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar" style="margin-bottom:10px">
+          <h2 style="margin:0">📌 Contas a receber</h2>
+          <input id="searchDiv" placeholder="Buscar cliente/descrição" />
+        </div>
+
+        <div style="overflow:auto">
+          <table id="tblDividas">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Valor</th>
+                <th>Venc.</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <p class="muted" style="margin:10px 0 0">
+          Status: <span class="warn">ATRASADO</span> quando passou do vencimento • <span class="ok">EM DIA</span> quando ainda não venceu
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ======= UTIL =======
+  const $$ = (sel) => document.querySelector(sel);
+  const fmtBRL = (n) => (n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const parseMoney = (s) => {
+    if (!s) return 0;
+    const cleaned = String(s).trim().replace(/\./g, "").replace(",", ".");
+    const v = Number(cleaned);
+    return Number.isFinite(v) ? v : 0;
+  };
+  const todayISO = () => new Date().toISOString().slice(0,10);
+  const isOverdue = (iso) => iso && iso < todayISO();
+
+  // ======= STORAGE =======
+  const KEY = "estoque_fiado_selma_v1";
+  const defaultData = { produtos: [], movs: [], dividas: [] };
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : structuredClone(defaultData);
+    } catch { return structuredClone(defaultData); }
+  }
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    pulseSaved();
+    renderAll();
+  }
+  function uid() {
+    return Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+
+  let state = load();
+  let selectedProductId = null;
+
+  // ======= UI DEFAULTS =======
+  $$("#movData").value = todayISO();
+  $$("#cVenc").value = todayISO();
+
+  // ======= STATUS PILL =======
+  let pillTimer = null;
+  function pulseSaved() {
+    const pill = $$("#statusPill");
+    pill.textContent = "Salvo ✅";
+    if (pillTimer) clearTimeout(pillTimer);
+    pillTimer = setTimeout(() => pill.textContent = "Salvo no aparelho ✅", 900);
+  }
+
+  // ======= PRODUTOS =======
+  function addProduto() {
+    const nome = $$("#pNome").value.trim();
+    const marca = $$("#pMarca").value;
+    const sku = $$("#pSku").value.trim();
+    const min = Number($$("#pMin").value || 0);
+    const custo = parseMoney($$("#pCusto").value);
+    const venda = parseMoney($$("#pVenda").value);
+    const qtd = Number($$("#pQtd").value || 0);
+
+    if (!nome) return alert("Digite o nome do produto.");
+    const produto = { id: uid(), nome, marca, sku, min, custo, venda, qtd };
+    state.produtos.unshift(produto);
+
+    if (qtd > 0) {
+      state.movs.unshift({
+        id: uid(),
+        data: todayISO(),
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        tipo: "entrada",
+        qtd,
+        obs: "Quantidade inicial"
+      });
+    }
+
+    limparProdutoForm();
+    save();
+  }
+
+  function limparProdutoForm() {
+    $$("#pNome").value = "";
+    $$("#pSku").value = "";
+    $$("#pMin").value = "1";
+    $$("#pCusto").value = "";
+    $$("#pVenda").value = "";
+    $$("#pQtd").value = "0";
+    $$("#pMarca").value = "Natura";
+  }
+
+  function selectProduto(id) {
+    const p = state.produtos.find(x => x.id === id);
+    if (!p) return;
+    selectedProductId = id;
+    $$("#movProduto").value = `${p.nome} (${p.marca})`;
+  }
+
+  function updateProduto(id, patch) {
+    const idx = state.produtos.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    state.produtos[idx] = { ...state.produtos[idx], ...patch };
+    save();
+  }
+
+  function editarProdutoPrompt(id) {
+    const p = state.produtos.find(x => x.id === id);
+    if (!p) return;
+
+    const nome = prompt("Nome do produto:", p.nome);
+    if (nome === null) return;
+
+    const marca = prompt("Marca (Natura / Boticário / Outro):", p.marca) || p.marca;
+    const sku = prompt("SKU/Código (opcional):", p.sku || "") ?? (p.sku || "");
+    const min = prompt("Estoque mínimo:", String(p.min ?? 0));
+    const custo = prompt("Preço de custo (ex: 25,90):", String(p.custo ?? 0).replace(".", ","));
+    const venda = prompt("Preço de venda (ex: 49,90):", String(p.venda ?? 0).replace(".", ","));
+
+    updateProduto(id, {
+      nome: String(nome).trim() || p.nome,
+      marca: ["Natura","Boticário","Outro"].includes(marca) ? marca : p.marca,
+      sku: String(sku || "").trim(),
+      min: Math.max(0, Number(min || p.min || 0)),
+      custo: Math.max(0, parseMoney(custo)),
+      venda: Math.max(0, parseMoney(venda)),
+    });
+  }
+
+  function removerProduto(id) {
+    const p = state.produtos.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`Remover "${p.nome}"? (Isso não apaga o histórico.)`)) return;
+    state.produtos = state.produtos.filter(x => x.id !== id);
+    if (selectedProductId === id) {
+      selectedProductId = null;
+      $$("#movProduto").value = "";
+    }
+    save();
+  }
+
+  // ======= MOVIMENTAÇÕES =======
+  function registrarMov() {
+    if (!selectedProductId) return alert("Selecione um produto na lista.");
+    const p = state.produtos.find(x => x.id === selectedProductId);
+    if (!p) return;
+
+    const tipo = $$("#movTipo").value;
+    const qtd = Math.max(1, Number($$("#movQtd").value || 1));
+    const obs = $$("#movObs").value.trim();
+    const data = $$("#movData").value || todayISO();
+
+    let novaQtd = p.qtd;
+    if (tipo === "entrada") novaQtd += qtd;
+    if (tipo === "saida") novaQtd -= qtd;
+
+    if (novaQtd < 0) return alert("Não dá pra dar saída maior que o estoque atual.");
+
+    p.qtd = novaQtd;
+
+    state.movs.unshift({
+      id: uid(),
+      data,
+      produtoId: p.id,
+      produtoNome: p.nome,
+      tipo,
+      qtd,
+      obs
+    });
+
+    $$("#movObs").value = "";
+    $$("#movQtd").value = "1";
+    save();
+  }
+
+  function limparMovForm() {
+    selectedProductId = null;
+    $$("#movProduto").value = "";
+    $$("#movTipo").value = "entrada";
+    $$("#movQtd").value = "1";
+    $$("#movObs").value = "";
+    $$("#movData").value = todayISO();
+  }
+
+  function limparHistorico() {
+    if (!confirm("Deseja apagar TODO o histórico de entradas/saídas?")) return;
+    state.movs = [];
+    save();
+  }
+
+  // ======= DÍVIDAS (CLIENTES) =======
+  function addDivida() {
+    const nome = $$("#cNome").value.trim();
+    const fone = $$("#cFone").value.trim();
+    const valor = parseMoney($$("#cValor").value);
+    const venc = $$("#cVenc").value || todayISO();
+    const desc = $$("#cDesc").value.trim();
+
+    if (!nome) return alert("Digite o nome do cliente.");
+    if (valor <= 0) return alert("Digite um valor maior que zero.");
+
+    state.dividas.unshift({
+      id: uid(),
+      nome,
+      fone,
+      valor,
+      venc,
+      desc,
+      createdAt: todayISO(),
+      pago: false,
+      pagoEm: null
+    });
+
+    limparDividaForm();
+    save();
+  }
+
+  function limparDividaForm() {
+    $$("#cNome").value = "";
+    $$("#cFone").value = "";
+    $$("#cValor").value = "";
+    $$("#cVenc").value = todayISO();
+    $$("#cDesc").value = "";
+  }
+
+  function marcarComoPago(id) {
+    const d = state.dividas.find(x => x.id === id);
+    if (!d) return;
+    if (!confirm(`Marcar como PAGO? Cliente: ${d.nome} — R$ ${fmtBRL(d.valor)}`)) return;
+    d.pago = true;
+    d.pagoEm = todayISO();
+    save();
+  }
+
+  function desfazerPago(id) {
+    const d = state.dividas.find(x => x.id === id);
+    if (!d) return;
+    d.pago = false;
+    d.pagoEm = null;
+    save();
+  }
+
+  function editarDividaPrompt(id) {
+    const d = state.dividas.find(x => x.id === id);
+    if (!d) return;
+
+    const nome = prompt("Cliente:", d.nome);
+    if (nome === null) return;
+    const fone = prompt("Telefone:", d.fone || "") ?? (d.fone || "");
+    const valor = prompt("Valor (ex: 120,00):", String(d.valor ?? 0).replace(".", ","));
+    const venc = prompt("Vencimento (AAAA-MM-DD):", d.venc || todayISO());
+    const desc = prompt("Descrição/Nota:", d.desc || "");
+
+    d.nome = String(nome).trim() || d.nome;
+    d.fone = String(fone || "").trim();
+    d.valor = Math.max(0, parseMoney(valor));
+    d.venc = (String(venc || "").trim() || d.venc);
+    d.desc = String(desc || "").trim();
+    save();
+  }
+
+  function removerDivida(id) {
+    const d = state.dividas.find(x => x.id === id);
+    if (!d) return;
+    if (!confirm(`Remover nota de "${d.nome}" no valor R$ ${fmtBRL(d.valor)}?`)) return;
+    state.dividas = state.dividas.filter(x => x.id !== id);
+    save();
+  }
+
+  // ======= RENDER =======
+  function renderKPIs() {
+    $$("#kpiProdutos").textContent = String(state.produtos.length);
+    const totalItens = state.produtos.reduce((acc,p)=>acc+(p.qtd||0),0);
+    $$("#kpiItens").textContent = String(totalItens);
+
+    const totalReceber = state.dividas
+      .filter(d => !d.pago)
+      .reduce((acc,d)=>acc+(d.valor||0),0);
+    $$("#kpiReceber").textContent = fmtBRL(totalReceber);
+  }
+
+  function renderProdutos() {
+    const q = $$("#searchProduto").value.trim().toLowerCase();
+    const marca = $$("#filtroMarca").value;
+
+    const tbody = $$("#tblProdutos tbody");
+    tbody.innerHTML = "";
+
+    const items = state.produtos
+      .filter(p => !marca || p.marca === marca)
+      .filter(p => {
+        if (!q) return true;
+        const hay = `${p.nome} ${p.marca} ${p.sku||""}`.toLowerCase();
+        return hay.includes(q);
+      });
+
+    for (const p of items) {
+      const baixo = (p.qtd || 0) < (p.min || 0);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><b>${escapeHtml(p.nome)}</b><div class="tiny">Custo: R$ ${fmtBRL(p.custo||0)}</div></td>
+        <td>${escapeHtml(p.marca||"")}</td>
+        <td>${escapeHtml(p.sku||"")}</td>
+        <td><b>${p.qtd||0}</b></td>
+        <td>${p.min||0}</td>
+        <td>R$ ${fmtBRL(p.venda||0)}</td>
+        <td>${baixo ? `<span class="warn">BAIXO</span>` : `<span class="ok">OK</span>`}</td>
+        <td class="actions">
+          <button class="secondary" data-act="sel">Selecionar</button>
+          <button class="secondary" data-act="edit">Editar</button>
+          <button class="danger" data-act="del">Remover</button>
+        </td>
+      `;
+      tr.querySelector('[data-act="sel"]').onclick = (e) => { e.stopPropagation(); selectProduto(p.id); };
+      tr.querySelector('[data-act="edit"]').onclick = (e) => { e.stopPropagation(); editarProdutoPrompt(p.id); };
+      tr.querySelector('[data-act="del"]').onclick = (e) => { e.stopPropagation(); removerProduto(p.id); };
+      tr.style.cursor = "pointer";
+      tr.onclick = () => selectProduto(p.id);
+      tbody.appendChild(tr);
+    }
+
+    if (items.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="8" class="muted">Nenhum produto encontrado.</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderMovs() {
+    const q = $$("#searchMov").value.trim().toLowerCase();
+    const tbody = $$("#tblMov tbody");
+    tbody.innerHTML = "";
+
+    const items = state.movs.filter(m => {
+      if (!q) return true;
+      const hay = `${m.produtoNome} ${m.obs||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+    for (const m of items) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(m.data||"")}</td>
+        <td>${escapeHtml(m.produtoNome||"")}</td>
+        <td>${m.tipo === "entrada" ? "Entrada (+)" : "Saída (-)"}</td>
+        <td><b>${m.qtd||0}</b></td>
+        <td>${escapeHtml(m.obs||"")}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    if (items.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="5" class="muted">Sem histórico ainda.</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderDividas() {
+    const q = $$("#searchDiv").value.trim().toLowerCase();
+    const tbody = $$("#tblDividas tbody");
+    tbody.innerHTML = "";
+
+    const items = state.dividas.filter(d => {
+      if (!q) return true;
+      const hay = `${d.nome} ${d.fone||""} ${d.desc||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+    for (const d of items) {
+      const atrasado = !d.pago && isOverdue(d.venc);
+      const status = d.pago
+        ? `<span class="ok">PAGO</span><div class="tiny">em ${escapeHtml(d.pagoEm||"")}</div>`
+        : (atrasado ? `<span class="warn">ATRASADO</span>` : `<span class="ok">EM DIA</span>`);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <b>${escapeHtml(d.nome)}</b>
+          ${d.fone ? `<div class="tiny">${escapeHtml(d.fone)}</div>` : ``}
+          ${d.desc ? `<div class="tiny">${escapeHtml(d.desc)}</div>` : ``}
+        </td>
+        <td><b>R$ ${fmtBRL(d.valor||0)}</b></td>
+        <td>${escapeHtml(d.venc||"")}</td>
+        <td>${status}</td>
+        <td class="actions">
+          ${d.pago
+            ? `<button class="secondary" data-act="undo">Desfazer</button>`
+            : `<button data-act="pay">Marcar pago</button>`
+          }
+          <button class="secondary" data-act="edit">Editar</button>
+          <button class="danger" data-act="del">Remover</button>
+        </td>
+      `;
+
+      const payBtn = tr.querySelector('[data-act="pay"]');
+      if (payBtn) payBtn.onclick = () => marcarComoPago(d.id);
+
+      const undoBtn = tr.querySelector('[data-act="undo"]');
+      if (undoBtn) undoBtn.onclick = () => desfazerPago(d.id);
+
+      tr.querySelector('[data-act="edit"]').onclick = () => editarDividaPrompt(d.id);
+      tr.querySelector('[data-act="del"]').onclick = () => removerDivida(d.id);
+
+      tbody.appendChild(tr);
+    }
+
+    if (items.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="5" class="muted">Nenhuma nota lançada ainda.</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderAll() {
+    renderKPIs();
+    renderProdutos();
+    renderMovs();
+    renderDividas();
+  }
+
+  // ======= EXPORT / IMPORT / CSV =======
+  function exportBackup() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `backup_selma_${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importBackup(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(reader.result);
+        state = {
+          produtos: Array.isArray(obj.produtos) ? obj.produtos : [],
+          movs: Array.isArray(obj.movs) ? obj.movs : [],
+          dividas: Array.isArray(obj.dividas) ? obj.dividas : [],
+        };
+        selectedProductId = null;
+        $$("#movProduto").value = "";
+        save();
+        alert("Backup importado com sucesso!");
+      } catch (e) {
+        alert("Não consegui importar. Arquivo inválido.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function exportCSV() {
+    const header = ["nome","marca","sku","qtd","min","custo","venda"];
+    const rows = state.produtos.map(p => [
+      p.nome, p.marca, p.sku||"", p.qtd||0, p.min||0,
+      (p.custo||0).toString().replace(".", ","),
+      (p.venda||0).toString().replace(".", ",")
+    ]);
+    const csv = [header, ...rows].map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(";")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `produtos_selma_${todayISO()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function resetAll() {
+    if (!confirm("Isso vai apagar tudo (produtos, histórico e dívidas). Tem certeza?")) return;
+    state = structuredClone(defaultData);
+    selectedProductId = null;
+    limparMovForm();
+    limparProdutoForm();
+    limparDividaForm();
+    save();
+  }
+
+  function escapeHtml(str) {
+    return String(str||"")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // ======= EVENTOS =======
+  $$("#btnAddProduto").onclick = addProduto;
+  $$("#btnLimparProduto").onclick = limparProdutoForm;
+
+  $$("#btnMov").onclick = registrarMov;
+  $$("#btnMovLimpar").onclick = limparMovForm;
+
+  $$("#btnAddDivida").onclick = addDivida;
+  $$("#btnLimparDivida").onclick = limparDividaForm;
+
+  $$("#searchProduto").oninput = renderProdutos;
+  $$("#filtroMarca").onchange = renderProdutos;
+  $$("#searchMov").oninput = renderMovs;
+  $$("#searchDiv").oninput = renderDividas;
+
+  $$("#btnExport").onclick = exportBackup;
+  $$("#btnImport").onclick = () => $$("#fileImport").click();
+  $$("#fileImport").onchange = (e) => {
+    const f = e.target.files?.[0];
+    if (f) importBackup(f);
+    e.target.value = "";
+  };
+
+  $$("#btnCSV").onclick = exportCSV;
+  $$("#btnReset").onclick = resetAll;
+  $$("#btnLimparHistorico").onclick = limparHistorico;
+
+  // inicial
+  renderAll();
+</script>
+
+<!-- PWA: registrar Service Worker (offline/app) -->
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js");
+    });
+  }
+</script>
+
+</body>
+</html>
